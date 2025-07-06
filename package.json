@@ -1,0 +1,61 @@
+{
+  "name": "whatsapp-gemini-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot yang terintegrasi dengan Google Gemini AI untuk auto-reply semua pesan",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "node -c index.js && node -c gemini.js",
+    "install-deps": "npm install --no-audit --no-fund",
+    "clean": "rm -rf node_modules package-lock.json",
+    "reset": "rm -rf node_modules package-lock.json sessions && npm install"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "gemini",
+    "ai",
+    "auto-reply",
+    "node.js",
+    "termux",
+    "pterodactyl"
+  ],
+  "author": "WhatsApp Gemini Bot",
+  "license": "MIT",
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "axios": "^1.6.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=14.0.0",
+    "npm": ">=6.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/whatsapp-gemini-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/whatsapp-gemini-bot/issues"
+  },
+  "homepage": "https://github.com/yourusername/whatsapp-gemini-bot#readme",
+  "os": [
+    "linux",
+    "darwin",
+    "android"
+  ],
+  "cpu": [
+    "x64",
+    "arm64",
+    "arm"
+  ],
+  "preferGlobal": false,
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  }
+}
