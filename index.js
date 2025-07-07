@@ -1,24 +1,32 @@
-const { Client, RemoteAuth } = require('whatsapp-web.js');
-const { getGeminiResponse } = require('./gemini');
+/*
+ * WhatsApp Gemini Bot
+ * Created by: Lewis
+ * License: MIT
+ * Description: WhatsApp Bot dengan Google Gemini Pro API
+ * Compatible with: Termux Android, Node.js >=16
+ */
+
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
+const axios = require('axios');
 const fs = require('fs');
-const path = require('path');
+const Database = require('./db');
 
-// Konfigurasi
-const SESSION_PATH = './sessions';
-const API_KEY = 'YOUR_GEMINI_API_KEY'; // Ganti dengan API key Anda
-
-// Pastikan folder sessions ada
-if (!fs.existsSync(SESSION_PATH)) {
-    fs.mkdirSync(SESSION_PATH, { recursive: true });
+// Load configuration
+let config;
+try {
+    config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+} catch (error) {
+    console.error('Error loading config.json:', error.message);
+    process.exit(1);
 }
 
-// Inisialisasi client WhatsApp dengan RemoteAuth
+// Initialize database
+const db = new Database();
+
+// Initialize WhatsApp client
 const client = new Client({
-    authStrategy: new RemoteAuth({
-        clientId: 'gemini-bot',
-        dataPath: SESSION_PATH,
-        backupSyncIntervalMs: 300000 // Backup setiap 5 menit
-    }),
+    authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
         args: [
@@ -34,130 +42,144 @@ const client = new Client({
     }
 });
 
-// Event: Client siap
-client.on('ready', () => {
-    console.log('✅ Bot WhatsApp berhasil login dan siap digunakan!');
-    console.log('🤖 Semua pesan akan otomatis dijawab oleh Gemini AI');
-    console.log('📱 Bot ID:', client.info.wid.user);
-});
-
-// Event: QR Code untuk pairing (fallback jika pairing code gagal)
+// Event handlers
 client.on('qr', (qr) => {
-    console.log('📱 Jika pairing code gagal, scan QR code di bawah:');
-    console.log(qr);
+    console.log('🔍 Scan QR Code untuk login WhatsApp Web:');
+    qrcode.generate(qr, { small: true });
 });
 
-// Event: Authenticated
+client.on('ready', () => {
+    console.log(`✅ ${config.bot_name} berhasil terhubung!`);
+    console.log(`👤 Bot Owner: ${config.owner}`);
+    console.log('🚀 Bot siap menerima pesan...');
+});
+
 client.on('authenticated', () => {
-    console.log('✅ Autentikasi berhasil! Sesi login telah disimpan');
+    console.log('✅ Autentikasi berhasil!');
 });
 
-// Event: Authentication failure
 client.on('auth_failure', (msg) => {
     console.error('❌ Autentikasi gagal:', msg);
 });
 
-// Event: Disconnected
 client.on('disconnected', (reason) => {
-    console.log('⚠️  Bot terputus:', reason);
-    console.log('🔄 Mencoba reconnect...');
+    console.log('❌ Bot terputus:', reason);
 });
 
-// Event: Remote session saved
-client.on('remote_session_saved', () => {
-    console.log('💾 Sesi remote berhasil disimpan');
-});
-
-// Event: Pairing code
-client.on('pairing_code', (code) => {
-    console.log('🔑 Pairing Code:', code);
-    console.log('📱 Masukkan kode di atas ke WhatsApp Anda:');
-    console.log('   1. Buka WhatsApp');
-    console.log('   2. Tap titik tiga > Perangkat Tertaut');
-    console.log('   3. Tap "Tautkan Perangkat"');
-    console.log('   4. Masukkan kode:', code);
-});
-
-// Event: Pesan masuk
+// Message handler
 client.on('message', async (message) => {
     try {
-        // Cek apakah pesan dari bot sendiri
+        // Abaikan pesan dari grup
+        if (message.from.includes('@g.us')) {
+            return;
+        }
+
+        // Abaikan pesan kosong atau media
+        if (!message.body || message.hasMedia) {
+            return;
+        }
+
+        // Abaikan pesan dari bot sendiri
         if (message.fromMe) {
             return;
         }
 
-        // Cek apakah pesan dari grup atau chat pribadi
-        const chat = await message.getChat();
-        const contact = await message.getContact();
-        
-        console.log('📨 Pesan masuk dari:', contact.name || contact.pushname || message.from);
-        console.log('💬 Isi pesan:', message.body);
+        const sender = message.from.replace('@c.us', '');
+        const userMessage = message.body.trim();
 
-        // Cek apakah pesan kosong atau hanya media
-        if (!message.body || message.body.trim() === '') {
-            console.log('⚠️  Pesan kosong atau hanya media, diabaikan');
-            return;
-        }
+        console.log(`📩 Pesan dari ${sender}: ${userMessage}`);
 
-        // Tampilkan typing indicator
-        chat.sendStateTyping();
+        // Kirim indikator mengetik
+        await message.getChat().then(chat => chat.sendStateTyping());
 
-        // Kirim pesan ke Gemini API
-        console.log('🤖 Mengirim pesan ke Gemini AI...');
-        const geminiResponse = await getGeminiResponse(message.body, API_KEY);
+        // Proses dengan Gemini API
+        const response = await processWithGemini(userMessage);
 
-        if (geminiResponse) {
-            // Kirim balasan
-            await message.reply(geminiResponse);
-            console.log('✅ Balasan berhasil dikirim');
-            console.log('🤖 Balasan:', geminiResponse.substring(0, 100) + '...');
-        } else {
-            // Jika Gemini gagal, kirim pesan error
-            await message.reply('❌ Maaf, terjadi kesalahan saat memproses pesan Anda. Silakan coba lagi.');
-            console.log('❌ Gagal mendapat respons dari Gemini');
-        }
+        // Kirim respons
+        await message.reply(response);
+
+        // Simpan log ke database
+        db.saveLog(sender, userMessage, response);
+
+        console.log(`✅ Respons terkirim ke ${sender}`);
 
     } catch (error) {
-        console.error('❌ Error saat memproses pesan:', error);
+        console.error('Error handling message:', error.message);
+        
         try {
-            await message.reply('❌ Maaf, terjadi kesalahan sistem. Silakan coba lagi.');
+            await message.reply('Maaf, terjadi kesalahan saat memproses pesan Anda. Silakan coba lagi nanti.');
         } catch (replyError) {
-            console.error('❌ Error saat mengirim pesan error:', replyError);
+            console.error('Error sending error message:', replyError.message);
         }
     }
 });
 
-// Error handling
-process.on('unhandledRejection', (err) => {
-    console.error('❌ Unhandled Promise Rejection:', err);
-});
+// Fungsi untuk memproses pesan dengan Gemini API
+async function processWithGemini(message) {
+    try {
+        const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/${config.gemini_model}:generateContent?key=${config.gemini_api_key}`,
+            {
+                contents: [{
+                    parts: [{
+                        text: message
+                    }]
+                }]
+            },
+            {
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000 // 30 detik timeout
+            }
+        );
 
-process.on('uncaughtException', (err) => {
-    console.error('❌ Uncaught Exception:', err);
-});
+        if (response.data && response.data.candidates && response.data.candidates[0]) {
+            const generatedText = response.data.candidates[0].content.parts[0].text;
+            return generatedText.trim();
+        } else {
+            throw new Error('Invalid response from Gemini API');
+        }
+
+    } catch (error) {
+        console.error('Gemini API Error:', error.message);
+        
+        if (error.response) {
+            console.error('API Response:', error.response.data);
+        }
+
+        // Fallback response
+        return 'Maaf, saya sedang mengalami gangguan. Silakan coba lagi nanti.';
+    }
+}
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-    console.log('\n🔄 Mematikan bot...');
-    await client.destroy();
-    process.exit(0);
+    console.log('\n🛑 Shutting down bot...');
+    
+    try {
+        await client.destroy();
+        db.close();
+        console.log('✅ Bot berhasil dimatikan');
+        process.exit(0);
+    } catch (error) {
+        console.error('Error during shutdown:', error.message);
+        process.exit(1);
+    }
 });
 
-process.on('SIGTERM', async () => {
-    console.log('\n🔄 Mematikan bot...');
-    await client.destroy();
-    process.exit(0);
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
 });
 
-// Jalankan bot
-console.log('🚀 Memulai bot WhatsApp...');
-console.log('⚠️  Pastikan Anda telah mengisi API_KEY Gemini di file ini!');
-console.log('🔑 Current API Key:', API_KEY === 'YOUR_GEMINI_API_KEY' ? 'BELUM DIISI!' : 'SUDAH DIISI ✅');
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
-if (API_KEY === 'YOUR_GEMINI_API_KEY') {
-    console.log('❌ PERINGATAN: API Key Gemini belum diisi!');
-    console.log('📝 Edit file index.js dan ganti YOUR_GEMINI_API_KEY dengan API key Anda');
-    process.exit(1);
-}
+// Start the bot
+console.log('🚀 Memulai WhatsApp Gemini Bot...');
+console.log(`📱 Compatible dengan Termux Android`);
+console.log(`🔧 Node.js version: ${process.version}`);
 
 client.initialize();
