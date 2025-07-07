@@ -1,23 +1,52 @@
 {
-  "name": "whatsapp-gemini-bot",
-  "version": "1.0.0",
-  "description": "WhatsApp Chatbot dengan Google Gemini Pro API",
+  "name": "Wa-OpenAI",
+  "version": "2.1.0",
+  "description": "WhatsApp Bot OpenAI ChatGPT Using Lib Baileys Multi Device",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
-    "install-deps": "npm install --no-optional --legacy-peer-deps"
+    "start": "node index.js"
   },
-  "keywords": ["whatsapp", "chatbot", "gemini", "ai", "termux"],
-  "author": "Lewis",
+  "keywords": [
+    "termux",
+    "whatsapp-openai",
+    "whatsapp-bot",
+    "whatsapp-baileys",
+    "baileys-md",
+    "bot-wa",
+    "bot-md",
+    "whatsapp-multi-device"
+  ],
+  "base": "https://github.com/DikaArdnt/Hisoka-Morou",
+  "author": "Yusril",
   "license": "MIT",
   "dependencies": {
-    "whatsapp-web.js": "1.21.0",
-    "axios": "1.5.0",
-    "qrcode-terminal": "0.12.0",
-    "sqlite3": "5.1.6"
+    "@hapi/boom": "^10.0.0",
+    "@whiskeysockets/baileys": "^6.7.16",
+    "awesome-phonenumber": "^2.64.0",
+    "axios": "^1.3.4",
+    "chalk": "^4.1.2",
+    "crypto": "^1.0.1",
+    "figlet": "^1.5.2",
+    "fs": "0.0.1-security",
+    "lodash": "^4.17.21",
+    "moment-timezone": "^0.5.46",
+    "openai": "^4.20.1",
+    "pino": "^7.0.5",
+    "qrcode-terminal": "^0.12.0",
+    "util": "^0.12.4",
+    "@google/generative-ai": "^0.15.0"
   },
-  "engines": {
-    "node": ">=16.0.0"
-  }
+  "directories": {
+    "lib": "lib",
+    "src": "src"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LewisSirait/BotWa.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LewisSirait/BotWa/issues"
+  },
+  "homepage": "https://github.com/LewisSirait/BotWa#readme"
 }
